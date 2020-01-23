@@ -1,2 +1,2 @@
 # go-home
-Go-lang code to control all the IoT devices in my house
+Go-lang mono-repo to control all the IoT devices in my house
