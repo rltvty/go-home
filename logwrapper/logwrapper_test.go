@@ -5,7 +5,7 @@ import (
 )
 
 func TestInvalidArg(t *testing.T) {
-	standardLogger := NewLogger()
+	standardLogger := GetInstance()
 	defer standardLogger.Sync()
 	standardLogger.InvalidArg("nachos")
 }
