@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/jsimonetti/go-artnet/packet"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rltvty/go-home/logwrapper"
+	"github.com/rltvty/go-home/netutils"
 )
 
 func index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -82,42 +82,6 @@ func sendDMX(conn *net.UDPConn, node *net.UDPAddr, universe uint8, data [512]byt
 	//fmt.Printf("packet sent, wrote %d bytes\n", n)
 }
 
-func getConnectedIPs() []net.IP {
-	log := logwrapper.GetInstance()
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		log.PanicError("Unable to parse network interfaces", err)
-	}
-	ips := make([]net.IP, 0)
-	for _, iface := range ifaces {
-		if iface.Flags & (net.FlagLoopback | net.FlagPointToPoint) != 0 {
-			continue
-		}
-		if !(iface.Flags & net.FlagUp != 0) {
-			continue
-		}
-
-		addresses, err := iface.Addrs()
-		if err != nil {
-			log.InfoError("Unable to list network addresses on interface", err)
-			continue
-		}
-		for _, address := range addresses {
-			var ip net.IP
-			switch v := address.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			if strings.ContainsRune(ip.String(), '.') {
-				log.Info("Found IP", log.String("ip", ip.String()))
-				ips = append(ips, ip)
-			}
-		}
-	}
-	return ips
-}
 
 func main() {
 	log := logwrapper.GetInstance()
@@ -133,7 +97,7 @@ func main() {
 	//10.10.10.20 on universe 1 -> Sink
 	//10.10.10.21 on universe 0 -> Shower
 
-	ips := getConnectedIPs()
+	ips := netutils.GetConnectedIPV4s()
 	if len(ips) == 0 {
 		log.PanicError("No active ipv4 network interfaces found", errors.New("No interfaces found"))
 	}
