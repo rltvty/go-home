@@ -7,6 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/rltvty/go-home/dmx/astronomy"
+
 	"github.com/jsimonetti/go-artnet/packet"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rltvty/go-home/logwrapper"
@@ -82,7 +86,6 @@ func sendDMX(conn *net.UDPConn, node *net.UDPAddr, universe uint8, data [512]byt
 	//fmt.Printf("packet sent, wrote %d bytes\n", n)
 }
 
-
 func main() {
 	log := logwrapper.GetInstance()
 	defer log.Sync()
@@ -96,6 +99,9 @@ func main() {
 
 	//10.10.10.20 on universe 1 -> Sink
 	//10.10.10.21 on universe 0 -> Shower
+
+	events, _ := astronomy.New().GetEvents()
+	log.Info("Got astronomical events", zap.Reflect("events", events))
 
 	ips := netutils.GetConnectedIPV4s()
 	if len(ips) == 0 {
