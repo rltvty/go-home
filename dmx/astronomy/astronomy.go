@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+const astronomyURL = "https://api.sunrise-sunset.org"
 const astronomyAPIURL = "https://api.sunrise-sunset.org/json?lat=%f&lng=%f&formatted=0"
 const myLatitude = 30.262890
 const myLongitude = -97.720119
@@ -24,7 +25,7 @@ func New(options ...func(*API)) *API {
 		Client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		URL: fmt.Sprintf(astronomyAPIURL, myLatitude, myLongitude),
+		URL: astronomyURL,
 	}
 	api.SetOptions(options...)
 
@@ -47,20 +48,22 @@ type Events struct {
 	Dusk    time.Time
 }
 
-type sunriseSunsetAPIResponse struct {
-	Results *struct {
-		Sunrise                   time.Time `json:"sunrise"`
-		Sunset                    time.Time `json:"sunset"`
-		SolarNoon                 time.Time `json:"solar_noon"`
-		DayLength                 int       `json:"day_length"`
-		CivilTwilightBegin        time.Time `json:"civil_twilight_begin"`
-		CivilTwilightEnd          time.Time `json:"civil_twilight_end"`
-		NauticalTwilightBegin     time.Time `json:"nautical_twilight_begin"`
-		NauticalTwilightEnd       time.Time `json:"nautical_twilight_end"`
-		AstronomicalTwilightBegin time.Time `json:"astronomical_twilight_begin"`
-		AstronomicalTwilightEnd   time.Time `json:"astronomical_twilight_end"`
-	} `json:"results,omitempty"`
-	Status string `json:"status"`
+type apiEvents struct {
+	Sunrise                   time.Time `json:"sunrise"`
+	Sunset                    time.Time `json:"sunset"`
+	SolarNoon                 time.Time `json:"solar_noon"`
+	DayLength                 int       `json:"day_length"`
+	CivilTwilightBegin        time.Time `json:"civil_twilight_begin"`
+	CivilTwilightEnd          time.Time `json:"civil_twilight_end"`
+	NauticalTwilightBegin     time.Time `json:"nautical_twilight_begin"`
+	NauticalTwilightEnd       time.Time `json:"nautical_twilight_end"`
+	AstronomicalTwilightBegin time.Time `json:"astronomical_twilight_begin"`
+	AstronomicalTwilightEnd   time.Time `json:"astronomical_twilight_end"`
+}
+
+type apiResponse struct {
+	Results json.RawMessage `json:"results"`
+	Status  string          `json:"status"`
 }
 
 var statusMap = map[string]string{
@@ -72,23 +75,39 @@ var statusMap = map[string]string{
 
 //GetEvents returns astronomical event times
 func (api *API) GetEvents() (*Events, error) {
-	resp, err := api.Client.Get(api.URL)
+	path := fmt.Sprintf("/json?lat=%f&lng=%f&formatted=0", myLatitude, myLongitude)
+	resp, err := api.Client.Get(fmt.Sprintf("%s%s", api.URL, path))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error making api request: %s", err)
 	}
 	defer resp.Body.Close()
 
-	var response sunriseSunsetAPIResponse
-	json.NewDecoder(resp.Body).Decode(&response)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Received unexpected response code: %s", resp.Status)
+	}
+
+	var response *apiResponse
+	decoder := json.NewDecoder(resp.Body)
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(&response)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to unmarshal the response json: %s", err)
+	}
+
 	if response.Status != "OK" {
+		fmt.Println(response)
 		return nil, fmt.Errorf("%s: %s", response.Status, statusMap[response.Status])
 	}
 
-	if response.Results == nil {
-		return nil, errors.New("MISSING_RESULTS: request was okay, but results are missing. try again")
+	var results *apiEvents
+	err = json.Unmarshal(response.Results, &results)
+	if err != nil {
+		return nil, err
+	}
+	if results == nil {
+		return nil, errors.New("Results json was empty")
 	}
 
-	results := response.Results
 	return &Events{
 		Dawn:    results.CivilTwilightBegin,
 		SunRise: results.Sunrise,
