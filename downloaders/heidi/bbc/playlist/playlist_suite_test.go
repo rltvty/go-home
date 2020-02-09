@@ -1,4 +1,4 @@
-package filter_test
+package playlist_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestFilter(t *testing.T) {
+func TestPlaylist(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Filter Suite")
+	RunSpecs(t, "Playlist Suite")
 }

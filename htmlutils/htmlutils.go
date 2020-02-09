@@ -14,6 +14,30 @@ import (
 	"golang.org/x/net/html"
 )
 
+//RemoveJunk removes all script, meta, link, style, comment nodes
+func RemoveJunk(rootNode *html.Node) {
+	junkNodes := FilterHTML([]*html.Node{rootNode}, func(n *html.Node) bool {
+		if n.Type == html.CommentNode {
+			return true
+		}
+
+		for _, tag := range []string{"script", "noscript", "meta", "link", "style"} {
+			if n.Data == tag {
+				return true
+			}
+		}
+		return false
+	})
+	RemoveNodes(junkNodes)
+}
+
+//RemoveNodes removes the passed nodes from their parent nodes
+func RemoveNodes(nodes []*html.Node) {
+	for _, node := range nodes {
+		node.Parent.RemoveChild(node)
+	}
+}
+
 //GetHTMLFromURL gets parsed html from an URL
 func GetHTMLFromURL(url string) (*html.Node, error) {
 	resp, err := http.Get(url)

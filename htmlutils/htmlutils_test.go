@@ -10,6 +10,21 @@ import (
 )
 
 var _ = Describe("Htmlutils", func() {
+	Describe("RemoveJunk", func() {
+		var rootNode *html.Node
+		BeforeEach(func() {
+			rootNode = GetHTMLFromFile("./test_data/1-jun-12.htm")
+			RemoveJunk(rootNode)
+		})
+		It("should return html with no junk tags", func() {
+			formattedHtml, _ := RenderHTMLNode(rootNode)
+			Expect(formattedHtml).ToNot(ContainSubstring("<script"))
+			Expect(formattedHtml).ToNot(ContainSubstring("<meta"))
+			Expect(formattedHtml).ToNot(ContainSubstring("<link"))
+			Expect(formattedHtml).ToNot(ContainSubstring("<style"))
+		})
+	})
+
 	Describe("RemoveEmpty", func() {
 		var inNode *html.Node
 		var outNode *html.Node
