@@ -3,7 +3,9 @@ package htmlutils
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/yosssi/gohtml"
@@ -23,6 +25,19 @@ func GetHTMLFromURL(url string) (*html.Node, error) {
 		return nil, fmt.Errorf("Error parsing html: %v", err)
 	}
 	return doc, nil
+}
+
+//GetHTMLFromFile gets parsed html from a file
+func GetHTMLFromFile(fileName string) *html.Node {
+	reader, err := os.Open(fileName)
+	if err != nil {
+		log.Fatalf("cannot open test file: %s", err)
+	}
+	rootNode, err := html.Parse(reader)
+	if err != nil {
+		log.Fatalf("cannot parse html in test file: %s", err)
+	}
+	return rootNode
 }
 
 //FilterHTML returns a slice of nodes that pass a filter
@@ -88,4 +103,120 @@ func GetAttr(n *html.Node, key string) *string {
 		}
 	}
 	return nil
+}
+
+func nodeType(n *html.Node) string {
+	switch n.Type {
+	case html.ElementNode:
+		return "ElementNode"
+	case html.ErrorNode:
+		return "ErrorNode"
+	case html.CommentNode:
+		return "CommentNode"
+	case html.DoctypeNode:
+		return "DoctypeNode"
+	case html.DocumentNode:
+		return "DocumentNode"
+	case html.TextNode:
+		return "TextNode"
+	default:
+		return "UnknownNodeType"
+	}
+}
+
+//DebugNode prints info about a node
+func DebugNode(prefix string, n *html.Node) {
+	log.Printf("%s %v '%s' %v", prefix, nodeType(n), strings.TrimSpace(n.Data), n.Attr)
+}
+
+//DebugTree prints the current node tree to stdout
+func DebugTree(rootNode *html.Node) {
+	var f func(*html.Node, string)
+	f = func(n *html.Node, offset string) {
+		DebugNode(offset, n)
+
+		//iterate on children
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c, offset+"  ")
+		}
+	}
+	f(rootNode, "")
+}
+
+//RemoveEmpty removes nodes that have no text content
+func RemoveEmpty(rootNode *html.Node) {
+	for {
+		nodesToRemove := []*html.Node{}
+		var f func(*html.Node)
+		f = func(n *html.Node) {
+
+			if n.Type == html.TextNode && strings.TrimSpace(n.Data) == "" {
+				//remove empty text nodes
+				nodesToRemove = append(nodesToRemove, n)
+			} else if n.Type == html.ElementNode && n.FirstChild == nil {
+				//remove element nodes with no children
+				nodesToRemove = append(nodesToRemove, n)
+			}
+
+			//iterate on children
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				f(c)
+			}
+		}
+		f(rootNode)
+
+		for _, nodeToRemove := range nodesToRemove {
+			nodeToRemove.Parent.RemoveChild(nodeToRemove)
+		}
+		if len(nodesToRemove) == 0 {
+			break
+		}
+	}
+}
+
+//Squash combines nodes that only have a single child, grouping attributes together
+func Squash(rootNode *html.Node) {
+	isSquashableNode := func(parent *html.Node) bool {
+		if parent.Type != html.ElementNode {
+			return false
+		}
+		firstChild := parent.FirstChild
+		if firstChild == nil || firstChild.Type != html.ElementNode {
+			return false
+		}
+		secondChild := firstChild.NextSibling
+		return secondChild == nil
+	}
+
+	var nodesToSquash []*html.Node
+	var findNodesToSquash func(*html.Node)
+	findNodesToSquash = func(n *html.Node) {
+		if isSquashableNode(n) {
+			nodesToSquash = append(nodesToSquash, n)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findNodesToSquash(c)
+		}
+	}
+	findNodesToSquash(rootNode)
+
+	for i := len(nodesToSquash); i > 0; i-- {
+		nodeToSquash := nodesToSquash[i-1]
+		if nodeToSquash.FirstChild != nil {
+			onlyChild := nodeToSquash.FirstChild
+			nodeToSquash.RemoveChild(onlyChild)
+
+			grandChildren := []*html.Node{}
+			for grandChild := onlyChild.FirstChild; grandChild != nil; grandChild = grandChild.NextSibling {
+				grandChildren = append(grandChildren, grandChild)
+			}
+
+			for _, grandChild := range grandChildren {
+				onlyChild.RemoveChild(grandChild)
+				nodeToSquash.AppendChild(grandChild)
+			}
+		}
+	}
+
+	//TODO: merge onlyChilds Attr into parents Attr
 }
