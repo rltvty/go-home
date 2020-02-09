@@ -1,11 +1,6 @@
 package htmlutils_test
 
 import (
-	"bytes"
-	"io"
-	"io/ioutil"
-	"os"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/html"
@@ -53,10 +48,12 @@ var _ = Describe("Htmlutils", func() {
 			outHtml, _ := htmlutils.RenderHTMLNode(outNode)
 			Expect(inHtml).To(Equal(outHtml))
 		})
-		AfterEach(func() {
-			buf := new(bytes.Buffer)
-			io.WriteString(buf, inHtml)
-			ioutil.WriteFile("./test_data/squash-current.htm", buf.Bytes(), os.ModePerm)
-		})
+		/*
+			AfterEach(func() {
+				buf := new(bytes.Buffer)
+				io.WriteString(buf, inHtml)
+				ioutil.WriteFile("./test_data/squash-current.htm", buf.Bytes(), os.ModePerm)
+			})
+		*/
 	})
 })

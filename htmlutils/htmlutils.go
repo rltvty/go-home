@@ -174,10 +174,27 @@ func RemoveEmpty(rootNode *html.Node) {
 	}
 }
 
+func mergeAttr(keep *html.Node, merge *html.Node) {
+	for _, mergeAttr := range merge.Attr {
+		if strings.TrimSpace(mergeAttr.Val) != "" {
+			foundKeepAttr := false
+			for i, keepAttr := range keep.Attr {
+				if keepAttr.Key == mergeAttr.Key {
+					foundKeepAttr = true
+					keep.Attr[i].Val = strings.TrimSpace(fmt.Sprintf("%s %s", keep.Attr[i].Val, mergeAttr.Val))
+				}
+			}
+			if !foundKeepAttr {
+				keep.Attr = append(keep.Attr, mergeAttr)
+			}
+		}
+	}
+}
+
 //Squash combines nodes that only have a single child, grouping attributes together
 func Squash(rootNode *html.Node) {
 	isSquashableNode := func(parent *html.Node) bool {
-		if parent.Type != html.ElementNode {
+		if parent.Type != html.ElementNode || parent.Data == "head" {
 			return false
 		}
 		firstChild := parent.FirstChild
@@ -205,6 +222,7 @@ func Squash(rootNode *html.Node) {
 		if nodeToSquash.FirstChild != nil {
 			onlyChild := nodeToSquash.FirstChild
 			nodeToSquash.RemoveChild(onlyChild)
+			mergeAttr(nodeToSquash, onlyChild)
 
 			grandChildren := []*html.Node{}
 			for grandChild := onlyChild.FirstChild; grandChild != nil; grandChild = grandChild.NextSibling {
@@ -217,6 +235,4 @@ func Squash(rootNode *html.Node) {
 			}
 		}
 	}
-
-	//TODO: merge onlyChilds Attr into parents Attr
 }
