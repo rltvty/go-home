@@ -33,10 +33,35 @@ var _ = Describe("Htmlutils", func() {
 			inNode = htmlutils.GetHTMLFromFile("./test_data/squash-in.htm")
 			outNode = htmlutils.GetHTMLFromFile("./test_data/squash-out.htm")
 		})
-		It("should return html nodes with a single child have been squashed", func() {
+		It("should return html nodes where single children have been squashed", func() {
 			RemoveEmpty(inNode) //this is required for Squash to function properly
 			Squash(inNode)
 			//htmlutils.WriteHTMLToFile(inNode, "./test_data/squash-current.htm")
+			inHtml, _ := htmlutils.RenderHTMLNode(inNode)
+			outHtml, _ := htmlutils.RenderHTMLNode(outNode)
+			Expect(inHtml).To(Equal(outHtml))
+		})
+	})
+
+	Describe("CleanClassAttr", func() {
+		var inNode *html.Node
+		var outNode *html.Node
+		BeforeEach(func() {
+			inNode = htmlutils.GetHTMLFromFile("./test_data/clean-in.htm")
+			outNode = htmlutils.GetHTMLFromFile("./test_data/clean-out.htm")
+		})
+		It("should return html nodes with a single child have been squashed", func() {
+			RemoveEmpty(inNode) //this is required for CleanClassAttr to function properly
+			valuesToKeep := []string{
+				"island",
+				"context__item",
+				"segments-list",
+				"segment__track",
+				"artist",
+				"no-margin",
+			}
+			CleanClassAttr(inNode, valuesToKeep)
+			//htmlutils.WriteHTMLToFile(inNode, "./test_data/clean-current.htm")
 			inHtml, _ := htmlutils.RenderHTMLNode(inNode)
 			outHtml, _ := htmlutils.RenderHTMLNode(outNode)
 			Expect(inHtml).To(Equal(outHtml))

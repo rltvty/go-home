@@ -211,6 +211,43 @@ func mergeAttr(keep *html.Node, merge *html.Node) {
 	}
 }
 
+//CleanClassAttr removes all class attribute values that arent in the valuesToKeep list
+func CleanClassAttr(rootNode *html.Node, valuesToKeep []string) {
+	keep := map[string]string{}
+	for _, valueToKeep := range valuesToKeep {
+		keep[valueToKeep] = ""
+	}
+
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		newAttrs := []html.Attribute{}
+		for _, oldAttr := range n.Attr {
+			if oldAttr.Key == "class" {
+				oldValues := strings.Split(oldAttr.Val, " ")
+				newValues := []string{}
+				for _, oldValue := range oldValues {
+					if _, found := keep[oldValue]; found {
+						newValues = append(newValues, oldValue)
+					}
+				}
+				oldAttr.Val = strings.Join(newValues, " ")
+				if oldAttr.Val != "" {
+					newAttrs = append(newAttrs, oldAttr)
+				}
+			} else {
+				newAttrs = append(newAttrs, oldAttr)
+			}
+		}
+		n.Attr = newAttrs
+
+		//iterate on children
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(rootNode)
+}
+
 //Squash combines nodes that only have a single child, grouping attributes together
 func Squash(rootNode *html.Node) {
 	isSquashableNode := func(parent *html.Node) bool {
