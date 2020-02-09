@@ -3,6 +3,8 @@ package htmlutils
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -38,6 +40,24 @@ func GetHTMLFromFile(fileName string) *html.Node {
 		log.Fatalf("cannot parse html in test file: %s", err)
 	}
 	return rootNode
+}
+
+//WriteHTMLToFile writes formatted html to a file
+func WriteHTMLToFile(rootNode *html.Node, fileName string) error {
+	buf := new(bytes.Buffer)
+	renderedHTML, err := RenderHTMLNode(rootNode)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(buf, renderedHTML)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(fileName, buf.Bytes(), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //FilterHTML returns a slice of nodes that pass a filter
