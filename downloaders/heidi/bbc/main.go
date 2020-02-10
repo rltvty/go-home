@@ -56,8 +56,6 @@ func getUrls(artist string) []string {
 	return urls
 }
 
-
-
 func main() {
 	//urls := getUrls("heidi")
 	urls := []string{

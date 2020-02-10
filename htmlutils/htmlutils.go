@@ -130,7 +130,7 @@ func IncludesAttr(n *html.Node, key string, val string) bool {
 	for _, a := range n.Attr {
 		if a.Key == key {
 			for _, v := range strings.Split(a.Val, " ") {
-				if v == val {
+				if strings.ToLower(v) == strings.ToLower(val) {
 					return true
 				}
 			}
