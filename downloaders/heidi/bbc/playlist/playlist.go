@@ -71,55 +71,65 @@ func SquashAndClean(rootNode *html.Node) {
 	htmlutils.CleanClassAttr(rootNode, valuesToKeep)
 }
 
-type track struct {
-	artist string
-	name   string
-	album  string
-	label  string
-	info   string
+//Track contains info about a music track
+type Track struct {
+	Artist string
+	Name   string
+	Album  string
+	Label  string
+	Info   string
 }
 
-func (t track) String() string {
-	return fmt.Sprintf("Artist: %s\nTrack: %s\nAlbum: %s\nLabel: %s\nInfo: %s\n", t.artist, t.name, t.album, t.label, t.info)
+func (t Track) String() string {
+	return fmt.Sprintf("Artist: %s\nTrack: %s\nAlbum: %s\nLabel: %s\nInfo: %s\n", t.Artist, t.Name, t.Album, t.Label, t.Info)
 }
 
 type playlist struct {
 	title string
 }
 
-func parseTrack(trackNode *html.Node) track {
-	trackHTML, _ := htmlutils.RenderHTMLNodes([]*html.Node{trackNode})
+//ParseTrack pulls track info from a track node
+func ParseTrack(trackNode *html.Node) Track {
 	fmt.Println("**** Original: ")
-	fmt.Println(trackHTML)
-	var t track
+	htmlutils.DebugTree(trackNode)
 
-	t.artist = getFirstText(trackNode, func(n *html.Node) bool {
-		return htmlutils.IncludesAttr(n, "class", "artist")
+	var t Track
+
+	artistTexts := getText(trackNode, func(n *html.Node) bool {
+		return n.Data == "h3" && htmlutils.IncludesAttr(n, "class", "artist")
 	})
-	t.name = getFirstText(trackNode, func(n *html.Node) bool {
+	t.Artist = strings.Join(artistTexts, " ")
+
+	nameTexts := getText(trackNode, func(n *html.Node) bool {
 		return n.Data == "p" && htmlutils.IncludesAttr(n, "class", "no-margin")
 	})
-	t.label = getFirstText(trackNode, func(n *html.Node) bool {
+	t.Name = strings.Join(nameTexts, " ")
+
+	t.Label = getFirstText(trackNode, func(n *html.Node) bool {
 		return htmlutils.IncludesAttr(n, "title", "label")
 	})
+	t.Label = strings.TrimSuffix(t.Label, ".")
+
 	album := getFirstText(trackNode, func(n *html.Node) bool {
 		return htmlutils.IncludesAttr(n, "class", "inline")
 	})
-	if album != t.label {
-		t.album = album
+	album = strings.TrimSuffix(t.Label, ".")
+	if album != t.Label {
+		t.Album = album
 	}
 	info := getLastText(trackNode, func(n *html.Node) bool {
 		return htmlutils.IncludesAttr(n, "class", "segment__track")
 	})
+	info = strings.TrimSuffix(info, ".")
 
-	if info != t.artist && info != t.name && info != t.label && info != t.album {
-		t.info = info
+	if info != t.Artist && info != t.Name && info != t.Label && info != t.Album {
+		t.Info = info
 	}
 
-	fmt.Println(t)
+	fmt.Print(t)
 	fmt.Println()
 
-	return track{}
+	return t
 }
 
 func getText(rootNode *html.Node, filter func(n *html.Node) bool) []string {
@@ -129,7 +139,7 @@ func getText(rootNode *html.Node, filter func(n *html.Node) bool) []string {
 	var f func(*html.Node)
 	f = func(n *html.Node) {
 		if n.Type == html.TextNode {
-			out = append(out, n.Data)
+			out = append(out, strings.TrimSpace(n.Data))
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			f(c)
@@ -223,7 +233,7 @@ func GetPlaylist(rootNode *html.Node) string {
 
 	for _, trackNode := range trackNodes {
 		trackNode.Parent.RemoveChild(trackNode)
-		parseTrack(trackNode)
+		ParseTrack(trackNode)
 	}
 
 	println()
