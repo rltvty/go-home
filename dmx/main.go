@@ -42,7 +42,7 @@ type loggingResponseWriter struct {
 
 func newLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
 	// WriteHeader(int) is not called if our response implicitly returns 200 OK, so
-	// we default to that status code.
+	// we default_loop to that status code.
 	return &loggingResponseWriter{w, http.StatusOK}
 }
 
@@ -101,7 +101,7 @@ func main() {
 	//10.10.10.21 on universe 0 -> Shower
 
 	events, _ := astronomy.New().GetEvents()
-	log.Info("Got astronomical events", zap.Reflect("events", events))
+	log.Info("Got astronomical events", zap.String("events", events.String()))
 
 	ips := netutils.GetConnectedIPV4s()
 	if len(ips) == 0 {

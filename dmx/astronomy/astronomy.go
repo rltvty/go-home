@@ -48,6 +48,16 @@ type Events struct {
 	Dusk    time.Time
 }
 
+func (e Events) String() string  {
+	dawn := e.Dawn.Local().Format("15:04")
+	rise := e.SunRise.Local().Format("15:04")
+	peak := e.SunPeak.Local().Format("15:04")
+	set := e.SunSet.Local().Format("15:04")
+	dusk := e.Dusk.Local().Format("15:04")
+
+	return fmt.Sprintf("Dawn: %s   Rise: %s   Peak: %s   Set: %s   Dusk: %s", dawn, rise, peak, set, dusk)
+}
+
 type apiEvents struct {
 	Sunrise                   time.Time `json:"sunrise"`
 	Sunset                    time.Time `json:"sunset"`
