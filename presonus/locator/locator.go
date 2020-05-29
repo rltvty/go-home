@@ -1,7 +1,9 @@
 package locator
 
 import (
+	"github.com/google/gopacket"
 	"net"
+	"strings"
 
 	"github.com/google/gopacket/pcap"
 	"github.com/rltvty/go-home/logwrapper"
@@ -62,60 +64,54 @@ func FindActiveIPV4Devices() (*[]Device, error) {
 }
 
 func Locate() {
-	FindActiveIPV4Devices()
-}
-
-/*
-func OtherLocate() {
-
-	port := 47809
-	fmt.Println("Listening for UDP Broadcast Packet")
-
-	socket, err := net.ListenUDP("udp4", &net.UDPAddr{
-		IP: net.IPv4(0, 0, 0, 0),
-		//IP:   net.IPv4( 192, 168, 1, 255 ),
-		Port: port,
-	})
-
-	if err != nil {
-		fmt.Println("Error listen: ", err)
-
-	}
-	for {
-		data := make([]byte, 4096)
-		read, remoteAddr, err := socket.ReadFromUDP(data)
-		if err != nil {
-			fmt.Println("readfromudp: ", err)
-		}
-		for i := 0; i < read; i++ {
-			fmt.Println(data[i])
-		}
-		fmt.Printf("Read from: %v\n", remoteAddr)
-	}
-}
-
-func Locate() {
 	log := logwrapper.GetInstance()
-	conn, err := net.ListenPacket("udp4", ":")
+	log.Info("starting")
+	devices, err :=	FindActiveIPV4Devices()
 	if err != nil {
-		log.InfoError("Unable to open udp connection", err)
+		log.InfoError("Unable to find Active IP4 devices", err)
 	}
-	defer conn.Close()
+	log.Info("Found IP4 Devices: ", zap.Any("devices", devices))
 
-	log.Info("Opened locator", zap.String("Address", conn.LocalAddr().String()))
-	buf := make([]byte, 1024)
-	for {
-		deadline := time.Now().Add(30 * time.Second)
-		err = conn.SetDeadline(deadline)
-		n, addr, err := conn.ReadFrom(buf[0:])
-		if err != nil {
-			log.InfoError("error on ReadFrom:", err)
-			return
+	var chosenDevice Device
+	for _, device := range *devices {
+		if strings.HasPrefix(device.Name, "en") {
+			chosenDevice = device
 		}
+	}
+	log.Info("Using Device: ", zap.String("name", chosenDevice.Name))
 
-		//bufStr := fmt.Sprintf("0x % x\n", buf[:n])
-		bufStr := fmt.Sprintf("%s", string(buf[:n]))
-		log.Info("Got UDP Packet", zap.String("From Address", addr.String()), zap.String("Data", bufStr))
+	inactive, err := pcap.NewInactiveHandle(chosenDevice.Name)
+	if err != nil {
+		log.InfoError("Unable to create pcap handle", err)
+	}
+	defer inactive.CleanUp()
+
+	// Call various functions on inactive to set it up the way you'd like:
+	if err = inactive.SetTimeout(pcap.BlockForever); err != nil {
+		log.InfoError("Error setting pcap timeout", err)
+	} else if err = inactive.SetPromisc(true); err != nil {
+		log.InfoError("Error setting pcap promiscuous mode", err)
+	}
+
+	// Finally, create the actual handle by calling Activate:
+	handle, err := inactive.Activate()  // after this, inactive is no longer valid
+	if err != nil {
+		log.InfoError("Error activating pcap handle", err)
+	}
+	defer handle.Close()
+
+	// Start processing packets
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	packetCount := 0
+	for packet := range packetSource.Packets() {
+		// Process packet here
+		log.Debug("Got Packet", zap.Any("Packet", packet))
+
+		packetCount++
+
+		// Only capture 100 and then stop
+		if packetCount > 100 {
+			break
+		}
 	}
 }
-*/
