@@ -84,7 +84,11 @@ func sendDMX(conn *net.UDPConn, node *net.UDPAddr, universe uint8, data [512]byt
 	//n, err := conn.WriteTo(b, node)
 	_, err = conn.WriteTo(b, node)
 	if err != nil {
-		fmt.Printf("error writing packet: %s\n", err)
+		now := time.Now()
+		if now.Second() % 60 == 0 {
+			fmt.Printf("Time is: %s  Error Writing packet: %s\n", now.Local().Format("15:04"), err)
+		}
+
 		return
 	}
 	//fmt.Printf("packet sent, wrote %d bytes\n", n)
@@ -120,6 +124,8 @@ func main() {
 
 	conn, err := net.ListenUDP("udp", localAddr)
 	if err != nil {
+
+
 		fmt.Printf("error opening udp: %s\n", err)
 		return
 	}
