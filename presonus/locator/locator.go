@@ -110,6 +110,8 @@ func Locate() {
 	// Start processing packets
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	packetCount := 0
+
+	items := make(map[string]Data)
 	for packet := range packetSource.Packets() {
 		// Process packet here
 		log.Debug("")
@@ -149,7 +151,11 @@ func Locate() {
 			log.Debug("Payload", zap.Any("data", string(app.Payload())))
 			item, _ := DecodeData(app.Payload(), "locator")
 			if item != nil {
-				log.Debug("Found item", zap.Any(item.Kind, item))
+				_, ok := items[item.MacAddress]
+				if !ok {
+					items[item.MacAddress] = *item
+					log.Info("Found new item", zap.Any(item.Kind, item))
+				}
 			}
 		}
 
@@ -168,6 +174,29 @@ type Data struct {
 	MacAddress string
 	Kind string
 }
+
+// Example speaker broadcasts payload:
+
+// 'UC\u0000\u0001¢æDAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL18sAI\u0000SPK\u000000:0A:92:C8:0B:EF\u0000\u0000'
+// 'UC\u0000\u0001¢ãDAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL315AI\u0000SPK\u000000:0A:92:C8:33:87\u0000\u0000'
+// 'UC\u0000\u0001+¢DAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL328AI\u0000SPK\u000000:0A:92:D7:04:10\u0000\u0000'
+// 'UC\u0000\u0001E¡DAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL328AI\u0000SPK\u000000:0A:92:D6:66:EE\u0000\u0000'
+// 'UC\u0000\u0001ÕÙDAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL328AI\u0000SPK\u000000:0A:92:D6:66:BB\u0000\u0000'
+// 'UC\u0000\u0001ÔÆDAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL315AI\u0000SPK\u000000:0A:92:C8:33:09\u0000\u0000'
+// 'UC\u0000\u0001\u000e©DAd\u0000\u0000\u0000\u0000\u0000\u0000\u0000SL18sAI\u0000SPK\u000000:0A:92:A9:19:0C\u0000\u0000'
+
+/* Example Mixer broadcast payload:
+{ actual_len: 75,
+  hex:
+   '55:43:00:01 08:cf:44:41 65:00:00:00 00:00:00:80 da:55:b3:49 12:b6:a0:40 99:55:ea:b6 f6:de:ac:b7
+    53:74:75:64 69:6f:4c:69 76:65:20:52 4d:31:36:20 41:49:2f:31 00:41:55:44 00:32:39:37 35:32:39:35
+    37:34:37:37 32:34:34:33 35:00:00',
+  base64:
+   'VUMAAQjPREFlAAAAAAAAgNpVs0kStqBAmVXqtvberLdTdHVkaW9MaXZlIFJNMTYgQUkvMQBBVUQAMjk3NTI5NTc0NzcyNDQzNQAA',
+  decoded:
+   'UC\u0000\u0001\bÏDAe\u0000\u0000\u0000\u0000\u0000\u0000¢ÚU³I\u0012¶ @¢Uê¶öÞ¬·StudioLive RM16 AI/1\u0000AUD\u00002975295747724435\u0000\u0000'
+ }
+*/
 
 func DecodeData(payload []byte, source string) (*Data, error) {
 	log := logwrapper.GetInstance()
@@ -191,7 +220,7 @@ func DecodeData(payload []byte, source string) (*Data, error) {
 					Mode: "broadcast",
 					Port: binary.LittleEndian.Uint16(payload[4:]),
 					Model: strings.TrimSpace(strings.ReplaceAll(string(payload[32:50]), string(0), " ")),
-					MacAddress: "",
+					MacAddress: "mixer",
 					Kind: "mixer",
 				}, nil
 			}
