@@ -2,14 +2,15 @@ package locator
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"net"
-	"strings"
-
 	"github.com/google/gopacket/pcap"
 	"github.com/rltvty/go-home/logwrapper"
 	"go.uber.org/zap"
+	"net"
+	"strings"
+	"time"
 )
 
 var privateIPV4Blocks []*net.IPNet
@@ -36,53 +37,75 @@ func isPrivateIPV4(ip net.IP) bool {
 	return false
 }
 
-//Device is a network interface
-type Device struct {
-	Name string
-	IP   net.IP
+type PresonusDevice struct {
+	Port       uint16
+	Model      string
+	MacAddress string
+	Kind       string
+	IP         net.IP
 }
 
 //FindActiveIPV4Devices finds network devices with active, non-loopback IP4 IP addresses
-func FindActiveIPV4Devices() (*[]Device, error) {
+func FindActiveIPV4Devices() (map[string]string, error) {
 	log := logwrapper.GetInstance()
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		log.InfoError("Unable to get network devices", err)
 		return nil, err
 	}
-	outDevices := []Device{}
+	outDevices := make(map[string]string)
 
 	for _, device := range devices {
-		log.Debug("Found potential device", zap.String("name", device.Name), zap.Any("info", device.Addresses))
-		for _, address := range device.Addresses {
-			if isPrivateIPV4(address.IP) {
-				log.Debug("Found active ipv4 device", zap.String("name", device.Name), zap.String("ip", address.IP.String()))
-				outDevices = append(outDevices, Device{Name: device.Name, IP: address.IP})
-				break
+		if strings.HasPrefix(device.Name, "en") {
+			log.Debug("Found potential device", zap.String("name", device.Name), zap.Any("info", device.Addresses))
+			for _, address := range device.Addresses {
+				if isPrivateIPV4(address.IP) {
+					log.Debug("Found active ipv4 device", zap.String("name", device.Name), zap.String("ip", address.IP.String()))
+					outDevices[device.Name] = address.IP.String()
+					break
+				}
 			}
 		}
 	}
-	return &outDevices, nil
+	return outDevices, nil
 }
 
-func Locate() {
+func WatchNetworkDevices(c chan string) {
 	log := logwrapper.GetInstance()
-	log.Info("starting")
-	devices, err :=	FindActiveIPV4Devices()
-	if err != nil {
-		log.InfoError("Unable to find Active IP4 devices", err)
-	}
-	log.Info("Found IP4 Devices: ", zap.Any("devices", devices))
 
-	var chosenDevice Device
-	for _, device := range *devices {
-		if strings.HasPrefix(device.Name, "en") {
-			chosenDevice = device
+	chosenDevice := ""
+	for {
+		devices, err := FindActiveIPV4Devices()
+		if err != nil {
+			log.InfoError("Unable to find Active IP4 devices", err)
 		}
-	}
-	log.Info("Using Device: ", zap.String("name", chosenDevice.Name))
+		log.Info("Found IP4 Devices: ", zap.Any("devices", devices))
 
-	inactive, err := pcap.NewInactiveHandle(chosenDevice.Name)
+		_, ok := devices[chosenDevice]
+		if !ok {
+			if chosenDevice != "" {
+				log.Info(fmt.Sprintf("Network device %s no longer available", chosenDevice))
+			}
+			newDevice := ""
+			if devices != nil || len(devices) > 0 {
+				for device := range devices {
+					newDevice = device
+					break
+				}
+			}
+			if newDevice != chosenDevice {
+				c <- newDevice
+				chosenDevice = newDevice
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func Locate(connectDevice string, c chan PresonusDevice, quit chan int) {
+	log := logwrapper.GetInstance()
+
+	inactive, err := pcap.NewInactiveHandle(connectDevice)
 	if err != nil {
 		log.InfoError("Unable to create pcap handle", err)
 	}
@@ -96,7 +119,7 @@ func Locate() {
 	}
 
 	// Finally, create the actual handle by calling Activate:
-	handle, err := inactive.Activate()  // after this, inactive is no longer valid
+	handle, err := inactive.Activate() // after this, inactive is no longer valid
 	if err != nil {
 		log.InfoError("Error activating pcap handle", err)
 	}
@@ -109,70 +132,66 @@ func Locate() {
 
 	// Start processing packets
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	packetCount := 0
 
-	items := make(map[string]Data)
-	for packet := range packetSource.Packets() {
-		// Process packet here
-		log.Debug("")
-		log.Debug("")
-		log.Debug("Got Packet", zap.Any("Packet", packet))
-
-		packetCount++
-
-		// Iterate over all layers, printing out each layer type
-		for _, layer := range packet.Layers() {
-			log.Debug("PACKET LAYER:", zap.Any("LayerType", layer.LayerType()))
-		}
-
-		// Get the Ethernet layer from this packet
-		if ethernetLayer := packet.Layer(layers.LayerTypeEthernet); ethernetLayer != nil {
-			// Get actual Ethernet data from this layer
-			ethernet, _ := ethernetLayer.(*layers.Ethernet)
-			log.Debug("MAC", zap.Any("src", ethernet.SrcMAC), zap.Any("dst", ethernet.DstMAC))
-		}
-
-		// Get the IPv4 layer from this packet
-		if ipv4Layer := packet.Layer(layers.LayerTypeIPv4); ipv4Layer != nil {
-			// Get actual IPv4 data from this layer
-			ipv4, _ := ipv4Layer.(*layers.IPv4)
-			log.Debug("IP", zap.Any("src", ipv4.SrcIP), zap.Any("dst", ipv4.DstIP))
-		}
-
-		// Get the UDP layer from this packet
-		if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
-			// Get actual UDP data from this layer
-			udp, _ := udpLayer.(*layers.UDP)
-			log.Debug("Ports", zap.Any("src", udp.SrcPort), zap.Any("dst", udp.DstPort))
-		}
-
-		// Get the Application layer from this packet
-		if app := packet.ApplicationLayer(); app != nil {
-			log.Debug("Payload", zap.Any("data", string(app.Payload())))
-			item, _ := DecodeData(app.Payload(), "locator")
-			if item != nil {
-				_, ok := items[item.MacAddress]
-				if !ok {
-					items[item.MacAddress] = *item
-					log.Info("Found new item", zap.Any(item.Kind, item))
-				}
-			}
-		}
-
-		// Only capture 100 and then stop
-		if packetCount > 100 {
-			break
+	for {
+		select {
+		case packet := <- packetSource.Packets():
+			processPacket(packet, c)
+			case <- quit:
+				log.Info("Locate received quit request, exiting...")
+				return
+		default:
+			//log.Info("Locate Sleeping")
+			time.Sleep(200 * time.Millisecond)
 		}
 	}
 }
 
-type Data struct {
-	Source string
-	Mode string
-	Port uint16
-	Model string
-	MacAddress string
-	Kind string
+func processPacket(packet gopacket.Packet, c chan PresonusDevice)  {
+	// Process packet here
+	log := logwrapper.GetInstance()
+	log.Debug("")
+	log.Debug("")
+	log.Debug("Got Packet", zap.Any("Packet", packet))
+
+	// Iterate over all layers, printing out each layer type
+	for _, layer := range packet.Layers() {
+		log.Debug("PACKET LAYER:", zap.Any("LayerType", layer.LayerType()))
+	}
+
+	// Get the Ethernet layer from this packet
+	var srcMac net.HardwareAddr
+	if ethernetLayer := packet.Layer(layers.LayerTypeEthernet); ethernetLayer != nil {
+		// Get actual Ethernet data from this layer
+		ethernet, _ := ethernetLayer.(*layers.Ethernet)
+		srcMac = ethernet.SrcMAC
+		log.Debug("MAC", zap.Any("src", ethernet.SrcMAC), zap.Any("dst", ethernet.DstMAC))
+	}
+
+	// Get the IPv4 layer from this packet
+	var srcIp net.IP
+	if ipv4Layer := packet.Layer(layers.LayerTypeIPv4); ipv4Layer != nil {
+		// Get actual IPv4 data from this layer
+		ipv4, _ := ipv4Layer.(*layers.IPv4)
+		srcIp = ipv4.SrcIP
+		log.Debug("IP", zap.Any("src", ipv4.SrcIP), zap.Any("dst", ipv4.DstIP))
+	}
+
+	// Get the UDP layer from this packet
+	if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		// Get actual UDP data from this layer
+		udp, _ := udpLayer.(*layers.UDP)
+		log.Debug("Ports", zap.Any("src", udp.SrcPort), zap.Any("dst", udp.DstPort))
+	}
+
+	// Get the Application layer from this packet
+	if app := packet.ApplicationLayer(); app != nil {
+		log.Debug("Payload", zap.Any("data", string(app.Payload())))
+		presonusDevice, _ := DecodeData(app.Payload(), srcMac, srcIp)
+		if presonusDevice != nil {
+			c <- *presonusDevice
+		}
+	}
 }
 
 // Example speaker broadcasts payload:
@@ -198,33 +217,78 @@ type Data struct {
  }
 */
 
-func DecodeData(payload []byte, source string) (*Data, error) {
+func DecodeData(payload []byte, srcMac net.HardwareAddr, srcIp net.IP) (*PresonusDevice, error) {
 	log := logwrapper.GetInstance()
 	if string(payload[0:2]) == "UC" {
 		code := binary.LittleEndian.Uint16(payload[6:])
 		switch code {
 		case 16708:
 			log.Debug("Found Presounus Broadcast")
-			if len(payload) <= 50 {
-				return &Data{
-					Source: source,
-					Mode: "broadcast",
-					Port: binary.LittleEndian.Uint16(payload[4:]),
-					Model: strings.TrimSpace(strings.ReplaceAll(string(payload[16:28]), string(0), " ")),
-					MacAddress: string(payload[28:45]),
-					Kind: "speaker",
-				}, nil
-			} else {
-				return &Data{
-					Source: source,
-					Mode: "broadcast",
-					Port: binary.LittleEndian.Uint16(payload[4:]),
-					Model: strings.TrimSpace(strings.ReplaceAll(string(payload[32:50]), string(0), " ")),
-					MacAddress: "mixer",
-					Kind: "mixer",
-				}, nil
+			data := PresonusDevice{
+				Port:       binary.LittleEndian.Uint16(payload[4:]),
+				IP:         srcIp,
+				MacAddress: srcMac.String(),
 			}
+
+			if len(payload) <= 50 {
+				data.Model = strings.TrimSpace(strings.ReplaceAll(string(payload[16:28]), string(0), " "))
+				data.Kind = "speaker"
+			} else {
+				data.Model = strings.TrimSpace(strings.ReplaceAll(string(payload[32:50]), string(0), " "))
+				data.Kind = "mixer"
+			}
+			return &data, nil
 		}
 	}
 	return nil, nil
+}
+
+func ManageDevices() {
+	log := logwrapper.GetInstance()
+	log.SetLevel(zap.InfoLevel)
+	log.Info("starting")
+
+	presonusChannel := make(chan PresonusDevice)
+	go func() {
+		for device := range presonusChannel {
+			log.Info("Found device:", zap.Any(device.Kind, device))
+		}
+	}()
+
+	networkChannel := make(chan string)
+	go WatchNetworkDevices(networkChannel)
+	var networkDevice string
+	for {
+		networkDevice = <-networkChannel
+		log.Info(fmt.Sprintf("New network device: %s", networkDevice))
+		if networkDevice != "" {
+			break
+		}
+	}
+
+	log.Info("Starting First Locate")
+	quit := make(chan int)
+	go Locate(networkDevice, presonusChannel, quit)
+
+	locateRunning := true
+	for {
+		networkDevice = <-networkChannel
+		if networkDevice == "" {
+			log.Info("Network device lost :(")
+		} else {
+			log.Info(fmt.Sprintf("New network device: %s", networkDevice))
+		}
+
+		if locateRunning {
+			log.Info("Quitting Locate")
+			quit <- 0
+			locateRunning = false
+		}
+
+		if networkDevice != "" {
+			log.Info("Starting New Locate")
+			go Locate(networkDevice, presonusChannel, quit)
+			locateRunning = true
+		}
+	}
 }

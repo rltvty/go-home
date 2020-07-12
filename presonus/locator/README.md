@@ -1,7 +1,13 @@
 # Locator
 
 Locator makes use of a pcap library to pull UDP broadcast packets off the wire.  Docs for the library can be found here:
-https://pkg.go.dev/github.com/google/gopacket
+https://pkg.go.dev/github.com/google/gopacket & https://pkg.go.dev/github.com/google/gopacket/pcap
+
+Locator maintains a live list of available Presonus Speaker and Mixer devices available on the network.  The list is 
+updated in real time as devices leave the network, or change connection details.  
+
+Locator continuously watches for Presonus Speaker and Mixer broadcast events, decodes them, and uses this information
+to keep the list updated.
 
 ## root permissions :(
 
