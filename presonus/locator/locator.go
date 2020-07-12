@@ -287,7 +287,6 @@ func ManageDevices(in chan PresonusDevice, out chan PresonusDeviceEvent) {
 
 func MainLoop(c chan PresonusDeviceEvent) {
 	log := logwrapper.GetInstance()
-	log.SetLevel(zap.InfoLevel)
 	log.Info("starting")
 
 	presonusChannel := make(chan PresonusDevice)
