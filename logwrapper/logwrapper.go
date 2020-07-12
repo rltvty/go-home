@@ -1,11 +1,10 @@
 package logwrapper
 
 import (
-	"os"
-	"sync"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
+	"sync"
 )
 
 //Environment PRODUCTION or DEVELOPMENT
@@ -19,13 +18,13 @@ const (
 //Config for intializing the logger
 type Config struct {
 	Env    Environment
-	Stderr *os.File
 	Stdout *os.File
 }
 
 // StandardLogger enforces specific log message formats
 type StandardLogger struct {
 	*zap.Logger
+	*zap.AtomicLevel
 }
 
 var logger *StandardLogger
@@ -36,21 +35,9 @@ func GetInstance(options ...func(*Config)) *StandardLogger {
 	once.Do(func() {
 		config := Config{
 			Env:    PRODUCTION,
-			Stderr: os.Stderr,
 			Stdout: os.Stdout,
 		}
 		config.SetOptions(options...)
-
-		// First, define our level-handling logic.
-		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl >= zapcore.ErrorLevel
-		})
-		lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl < zapcore.ErrorLevel
-		})
-
-		errorLog := zapcore.Lock(config.Stderr)
-		debugLog := zapcore.Lock(config.Stdout)
 
 		var encoder zapcore.Encoder
 		switch config.Env {
@@ -60,16 +47,9 @@ func GetInstance(options ...func(*Config)) *StandardLogger {
 			encoder = zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 		}
 
-		// Join the outputs, encoders, and level-handling functions into
-		// zapcore.Cores, then tee the four cores together.
-		core := zapcore.NewTee(
-			zapcore.NewCore(encoder, errorLog, highPriority),
-			zapcore.NewCore(encoder, debugLog, lowPriority),
-		)
-
-		// From a zapcore.Core, it's easy to construct a Logger.
-		baseLogger := zap.New(core)
-		logger = &StandardLogger{baseLogger}
+		atomicLevel := zap.NewAtomicLevel()
+		baseLogger := zap.New(zapcore.NewCore(encoder, zapcore.Lock(config.Stdout), atomicLevel))
+		logger = &StandardLogger{baseLogger, &atomicLevel}
 	})
 	return logger
 }

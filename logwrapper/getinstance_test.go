@@ -27,7 +27,6 @@ var _ = Describe("GetInstance", func() {
 				log.Fatal(err)
 			}
 			standardLogger = logwrapper.GetInstance(func(config *Config) {
-				config.Stderr = tempFile
 				config.Stdout = tempFile
 			})
 		})
@@ -63,7 +62,6 @@ var _ = Describe("GetInstance", func() {
 			}
 			standardLogger = GetInstance(func(config *Config) {
 				config.Env = DEVELOPMENT
-				config.Stderr = tempFile
 				config.Stdout = tempFile
 			})
 		})

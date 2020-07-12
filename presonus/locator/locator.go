@@ -8,6 +8,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/rltvty/go-home/logwrapper"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"net"
 	"strings"
 	"time"
@@ -287,6 +288,7 @@ func ManageDevices(in chan PresonusDevice, out chan PresonusDeviceEvent) {
 
 func MainLoop(c chan PresonusDeviceEvent) {
 	log := logwrapper.GetInstance()
+	log.SetLevel(zapcore.InfoLevel)
 	log.Info("starting")
 
 	presonusChannel := make(chan PresonusDevice)
