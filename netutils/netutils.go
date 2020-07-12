@@ -16,10 +16,10 @@ func GetConnectedIPV4s() []net.IP {
 	}
 	ips := make([]net.IP, 0)
 	for _, iface := range ifaces {
-		if iface.Flags & (net.FlagLoopback | net.FlagPointToPoint) != 0 {
+		if iface.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 {
 			continue
 		}
-		if !(iface.Flags & net.FlagUp != 0) {
+		if !(iface.Flags&net.FlagUp != 0) {
 			continue
 		}
 
