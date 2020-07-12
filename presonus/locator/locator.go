@@ -45,6 +45,11 @@ type PresonusDevice struct {
 	IP         net.IP
 }
 
+type PresonusDeviceEvent struct {
+	EventType string
+	Device PresonusDevice
+}
+
 //FindActiveIPV4Devices finds network devices with active, non-loopback IP4 IP addresses
 func FindActiveIPV4Devices() (map[string]string, error) {
 	log := logwrapper.GetInstance()
@@ -243,32 +248,36 @@ func DecodeData(payload []byte, srcMac net.HardwareAddr, srcIp net.IP) (*Presonu
 	return nil, nil
 }
 
-func ManageDevices(c chan PresonusDevice) {
-	log := logwrapper.GetInstance()
+func ManageDevices(in chan PresonusDevice, out chan PresonusDeviceEvent) {
+	//log := logwrapper.GetInstance()
 	devices := map[string]PresonusDevice{}
 	timeouts := map[string]time.Time{}
 
 	for {
 		select {
-		case newVersion := <-c:
+		case newVersion := <-in:
 			//log.Info("Found device:", zap.Any(newVersion.Kind, newVersion))
 			oldVersion, found := devices[newVersion.MacAddress]
 			if found {
 				if oldVersion.IP.String() != newVersion.IP.String() || oldVersion.Port != newVersion.Port {
-					log.Info("Found updated device:", zap.Any("old", oldVersion), zap.Any("new", newVersion))
+					//log.Info("Found updated device:", zap.Any("old", oldVersion), zap.Any("new", newVersion))
 					devices[newVersion.MacAddress] = newVersion
+					out <- PresonusDeviceEvent{EventType:"update", Device:newVersion}
 				}
 			} else {
-				log.Info("Found new device:", zap.Any(newVersion.Kind, newVersion))
+				//log.Info("Found new device:", zap.Any(newVersion.Kind, newVersion))
 				devices[newVersion.MacAddress] = newVersion
+				out <- PresonusDeviceEvent{EventType:"new", Device:newVersion}
 			}
-			timeouts[newVersion.MacAddress] = time.Now().Add(5 * time.Second)
+			timeouts[newVersion.MacAddress] = time.Now().Add(6 * time.Second)
 		default:
-			for device, timeout := range timeouts {
+			for macAddress, device := range devices {
+				timeout := timeouts[macAddress]
 				if time.Now().After(timeout) {
-					log.Info("Device Disappeared", zap.Any("old", device))
-					delete(timeouts, device)
-					delete(devices, device)
+					//log.Info("Device Disappeared", zap.Any("old", device))
+					delete(timeouts, macAddress)
+					delete(devices, macAddress)
+					out <- PresonusDeviceEvent{EventType:"delete", Device:device}
 				}
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -276,21 +285,13 @@ func ManageDevices(c chan PresonusDevice) {
 	}
 }
 
-/*
-func ManageDevices(c chan PresonusDevice)  {
-	log := logwrapper.GetInstance()
-	for newVersion := range c {
-		log.Info("Found device:", zap.Any(newVersion.Kind, newVersion))
-	}
-}*/
-
-func MainLoop() {
+func MainLoop(c chan PresonusDeviceEvent) {
 	log := logwrapper.GetInstance()
 	log.SetLevel(zap.InfoLevel)
 	log.Info("starting")
 
 	presonusChannel := make(chan PresonusDevice)
-	go ManageDevices(presonusChannel)
+	go ManageDevices(presonusChannel, c)
 
 	networkChannel := make(chan string)
 	go WatchNetworkDevices(networkChannel)
