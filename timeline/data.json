@@ -1,0 +1,65 @@
+[{
+    "id": 1,
+    "channel": "twitch.tv/ninja",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 10:12:00 PST 2019",
+    "endsAt": "Thu Jan 17 16:21:00 PST 2019",
+    "priority": 10
+  }, {
+    "id": 2,
+    "channel": "twitch.tv/lirik",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 08:02:00 PST 2019",
+    "endsAt": "Thu Jan 17 13:12:00 PST 2019",
+    "priority": 7
+  }, {
+    "id": 3,
+    "channel": "twitch.tv/ninja",
+    "type": "SCHEDULED",
+    "startsAt": "Thu Jan 17 19:00:00 PST 2019",
+    "endsAt": "Thu Jan 17 19:30:00 PST 2019",
+    "priority": 10
+  }, {
+    "id": 4,
+    "channel": "twitch.tv/summit1g",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 13:00:00 PST 2019",
+    "endsAt": "Thu Jan 17 15:00:00 PST 2019",
+    "priority": 2 
+  }, {
+    "id": 5,
+    "channel": "twitch.tv/annemunition",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 04:49:00 PST 2019",
+    "endsAt": "Thu Jan 17 11:33:00 PST 2019",
+    "priority": 8
+  }, {
+    "id": 6,
+    "channel": "twitch.tv/annemunition",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 13:01:00 PST 2019",
+    "endsAt": "Thu Jan 17 18:13:00 PST 2019",
+    "priority": 8
+  }, {
+    "id": 7,
+    "channel": "twitch.tv/shroud",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 18:52:00 PST 2019",
+    "endsAt": "Thu Jan 17 22:41:00 PST 2019",
+    "priority": 0
+  }, {
+    "id": 8,
+    "channel": "twitch.tv/admiralbahroo",
+    "type": "SCHEDULED",
+    "startsAt": "Thu Jan 17 7:00:00 PST 2019",
+    "endsAt": "Thu Jan 17 14:00:00 PST 2019",
+    "priority": 4
+  }, {
+    "id": 9,
+    "channel": "twitch.tv/fyrn",
+    "type": "GUESSTIMATE",
+    "startsAt": "Thu Jan 17 02:30:00 PST 2019",
+    "endsAt": "Thu Jan 17 03:30:00 PST 2019",
+    "priority": 0
+  }]
+  
