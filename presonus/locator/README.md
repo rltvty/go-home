@@ -11,8 +11,8 @@ to keep the list updated.
 
 ## root permissions :(
 
-We are using pcap in promiscous mode, that allows us to capture packets unrelated to this host.  Unfortately this requires 
-root permissions to run.  To start the tests do:
+We are using pcap in promiscous mode, that allows us to capture packets unrelated to this host.  Unfortunately this 
+requires root permissions to run.  To start the tests do:
 ```bash
 sudo -E go test -count=1 -v . 
 ```

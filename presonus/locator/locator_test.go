@@ -8,7 +8,7 @@ import (
 )
 
 var _ = Describe("Locator", func() {
-	Describe("ManageDevices", func() {
-		ManageDevices()
+	Describe("MainLoop", func() {
+		MainLoop()
 	})
 })

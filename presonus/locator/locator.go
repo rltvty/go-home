@@ -79,7 +79,7 @@ func WatchNetworkDevices(c chan string) {
 		if err != nil {
 			log.InfoError("Unable to find Active IP4 devices", err)
 		}
-		log.Info("Found IP4 Devices: ", zap.Any("devices", devices))
+		log.Debug("Found IP4 Devices: ", zap.Any("devices", devices))
 
 		_, ok := devices[chosenDevice]
 		if !ok {
@@ -137,9 +137,9 @@ func Locate(connectDevice string, c chan PresonusDevice, quit chan int) {
 		select {
 		case packet := <- packetSource.Packets():
 			processPacket(packet, c)
-			case <- quit:
-				log.Info("Locate received quit request, exiting...")
-				return
+		case <- quit:
+			log.Info("Locate received quit request, exiting...")
+			return
 		default:
 			//log.Info("Locate Sleeping")
 			time.Sleep(200 * time.Millisecond)
@@ -243,17 +243,54 @@ func DecodeData(payload []byte, srcMac net.HardwareAddr, srcIp net.IP) (*Presonu
 	return nil, nil
 }
 
-func ManageDevices() {
+func ManageDevices(c chan PresonusDevice) {
+	log := logwrapper.GetInstance()
+	devices := map[string]PresonusDevice{}
+	timeouts := map[string]time.Time{}
+
+	for {
+		select {
+		case newVersion := <-c:
+			//log.Info("Found device:", zap.Any(newVersion.Kind, newVersion))
+			oldVersion, found := devices[newVersion.MacAddress]
+			if found {
+				if oldVersion.IP.String() != newVersion.IP.String() || oldVersion.Port != newVersion.Port {
+					log.Info("Found updated device:", zap.Any("old", oldVersion), zap.Any("new", newVersion))
+					devices[newVersion.MacAddress] = newVersion
+				}
+			} else {
+				log.Info("Found new device:", zap.Any(newVersion.Kind, newVersion))
+				devices[newVersion.MacAddress] = newVersion
+			}
+			timeouts[newVersion.MacAddress] = time.Now().Add(5 * time.Second)
+		default:
+			for device, timeout := range timeouts {
+				if time.Now().After(timeout) {
+					log.Info("Device Disappeared", zap.Any("old", device))
+					delete(timeouts, device)
+					delete(devices, device)
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
+/*
+func ManageDevices(c chan PresonusDevice)  {
+	log := logwrapper.GetInstance()
+	for newVersion := range c {
+		log.Info("Found device:", zap.Any(newVersion.Kind, newVersion))
+	}
+}*/
+
+func MainLoop() {
 	log := logwrapper.GetInstance()
 	log.SetLevel(zap.InfoLevel)
 	log.Info("starting")
 
 	presonusChannel := make(chan PresonusDevice)
-	go func() {
-		for device := range presonusChannel {
-			log.Info("Found device:", zap.Any(device.Kind, device))
-		}
-	}()
+	go ManageDevices(presonusChannel)
 
 	networkChannel := make(chan string)
 	go WatchNetworkDevices(networkChannel)
