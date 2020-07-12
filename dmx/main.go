@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/rltvty/go-home/dmx/default_loop"
 	"net"
 	"net/http"
 	"time"
@@ -15,7 +16,10 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/rltvty/go-home/logwrapper"
 	"github.com/rltvty/go-home/netutils"
+    "github.com/RobinUS2/golang-moving-average"
 )
+
+const movingAverageSize = 1000
 
 func index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	fmt.Fprint(w, "Welcome!\n")
@@ -42,7 +46,7 @@ type loggingResponseWriter struct {
 
 func newLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
 	// WriteHeader(int) is not called if our response implicitly returns 200 OK, so
-	// we default to that status code.
+	// we default_loop to that status code.
 	return &loggingResponseWriter{w, http.StatusOK}
 }
 
@@ -80,7 +84,11 @@ func sendDMX(conn *net.UDPConn, node *net.UDPAddr, universe uint8, data [512]byt
 	//n, err := conn.WriteTo(b, node)
 	_, err = conn.WriteTo(b, node)
 	if err != nil {
-		fmt.Printf("error writing packet: %s\n", err)
+		now := time.Now()
+		if now.Second() % 60 == 0 {
+			fmt.Printf("Time is: %s  Error Writing packet: %s\n", now.Local().Format("15:04"), err)
+		}
+
 		return
 	}
 	//fmt.Printf("packet sent, wrote %d bytes\n", n)
@@ -101,7 +109,7 @@ func main() {
 	//10.10.10.21 on universe 0 -> Shower
 
 	events, _ := astronomy.New().GetEvents()
-	log.Info("Got astronomical events", zap.Reflect("events", events))
+	log.Info("Got astronomical events", zap.String("events", events.String()))
 
 	ips := netutils.GetConnectedIPV4s()
 	if len(ips) == 0 {
@@ -116,6 +124,8 @@ func main() {
 
 	conn, err := net.ListenUDP("udp", localAddr)
 	if err != nil {
+
+
 		fmt.Printf("error opening udp: %s\n", err)
 		return
 	}
@@ -124,10 +134,41 @@ func main() {
 	// should set full red
 
 	go func() {
+		//now := time.Now()
+		red := movingaverage.New(movingAverageSize)
+		blue := movingaverage.New(movingAverageSize)
+		green := movingaverage.New(movingAverageSize)
+		white := movingaverage.New(movingAverageSize)
+		amber := movingaverage.New(movingAverageSize)
+		uv := movingaverage.New(movingAverageSize)
+
 		for {
-			sendDMX(conn, sink, 1, [512]byte{0xFF, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0xFF})
-			sendDMX(conn, shower, 0, [512]byte{0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF})
-			time.Sleep(time.Second)
+			now := time.Now()
+			color, program := default_loop.Program(now, *events)
+			red.Add(float64(color.Red))
+			blue.Add(float64(color.Blue))
+			green.Add(float64(color.Green))
+			white.Add(float64(color.White))
+			amber.Add(float64(color.Amber))
+			uv.Add(float64(color.UV))
+
+			output := default_loop.Color{
+				Red:   byte(red.Avg()),
+				Blue:  byte(blue.Avg()),
+				Green: byte(green.Avg()),
+				White: byte(white.Avg()),
+				Amber: byte(amber.Avg()),
+				UV:    byte(uv.Avg()),
+			}
+
+			if now.Second() % 60 == 0 {
+				fmt.Printf("Time is: %s  On Program: %s  Program Color: %s  Output Color: %s\n", now.Local().Format("15:04"), program, color, output)
+			}
+
+			sendDMX(conn, sink, 1, [512]byte{output.Red, output.Green, output.Blue, output.White, output.Amber, output.UV, 0xFF})
+			sendDMX(conn, shower, 0, [512]byte{output.Red, output.Green, output.Blue, output.White, output.Amber, output.UV, 0xFF})
+			time.Sleep(time.Millisecond * 1000)
+			//now = now.Add(time.Minute)
 		}
 	}()
 
