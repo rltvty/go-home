@@ -89,16 +89,21 @@ func (manager *ClientManager) send(client *Client) {
 	}
 }
 
+var manager *ClientManager
+
 func StartManager() {
 	fmt.Println("Starting manager...")
-	manager := ClientManager{
+	manager = &ClientManager{
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 	}
 	go manager.start()
+}
 
-	connection, err := net.Dial("tcp", "10.10.10.228:56814")
+func InitConnection(device Device) {
+	address := fmt.Sprintf("%s,%v", device.IP, device.Port)
+	connection, err := net.Dial("tcp", address)
 	if err != nil {
 		fmt.Println(err)
 	}

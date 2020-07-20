@@ -1,0 +1,1 @@
+Connection is based on this blog post: https://www.thepolyglotdeveloper.com/2017/05/network-sockets-with-the-go-programming-language/

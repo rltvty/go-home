@@ -47,7 +47,7 @@ type PresonusDevice struct {
 }
 
 type PresonusDeviceEvent struct {
-	EventType string
+	IsAdd bool
 	Device PresonusDevice
 }
 
@@ -262,13 +262,14 @@ func ManageDevices(in chan PresonusDevice, out chan PresonusDeviceEvent) {
 			if found {
 				if oldVersion.IP.String() != newVersion.IP.String() || oldVersion.Port != newVersion.Port {
 					//log.Info("Found updated device:", zap.Any("old", oldVersion), zap.Any("new", newVersion))
+					out <- PresonusDeviceEvent{IsAdd:false, Device:oldVersion}
+					out <- PresonusDeviceEvent{IsAdd:true, Device:newVersion}
 					devices[newVersion.MacAddress] = newVersion
-					out <- PresonusDeviceEvent{EventType:"update", Device:newVersion}
 				}
 			} else {
 				//log.Info("Found new device:", zap.Any(newVersion.Kind, newVersion))
 				devices[newVersion.MacAddress] = newVersion
-				out <- PresonusDeviceEvent{EventType:"new", Device:newVersion}
+				out <- PresonusDeviceEvent{IsAdd:true, Device:newVersion}
 			}
 			timeouts[newVersion.MacAddress] = time.Now().Add(6 * time.Second)
 		default:
@@ -278,7 +279,7 @@ func ManageDevices(in chan PresonusDevice, out chan PresonusDeviceEvent) {
 					//log.Info("Device Disappeared", zap.Any("old", device))
 					delete(timeouts, macAddress)
 					delete(devices, macAddress)
-					out <- PresonusDeviceEvent{EventType:"delete", Device:device}
+					out <- PresonusDeviceEvent{IsAdd:false, Device:device}
 				}
 			}
 			time.Sleep(100 * time.Millisecond)
