@@ -30,7 +30,7 @@ func main()  {
 								log.Info("returning after client 'read' channel has closed")
 								return
 							}
-							log.Info("reading from client channel", zap.ByteString("message", read))
+							log.Debug("reading from client channel", zap.ByteString("message", read))
 					}
 				}()
 			} else {
