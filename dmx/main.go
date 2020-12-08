@@ -12,11 +12,11 @@ import (
 
 	"github.com/rltvty/go-home/dmx/astronomy"
 
+	"github.com/RobinUS2/golang-moving-average"
 	"github.com/jsimonetti/go-artnet/packet"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rltvty/go-home/logwrapper"
 	"github.com/rltvty/go-home/netutils"
-    "github.com/RobinUS2/golang-moving-average"
 )
 
 const movingAverageSize = 1000
