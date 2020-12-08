@@ -1,0 +1,15 @@
+body{
+  font-family: Tahoma, sans-serif;
+  padding: 0;
+  margin:0;
+  background-color: #f4f4f4;
+  color: #3c326e;
+}
+
+@media(max-width: 768px){
+  header #branding,
+  article#main-col,
+  header{
+    padding-bottom: 20px;
+  }
+}
